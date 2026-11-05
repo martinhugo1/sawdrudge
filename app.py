@@ -40,39 +40,41 @@ def abs_urls(soup, base):
 
 
 def replace_masthead(soup):
-    # Prefer replacing branded masthead imagery rather than a news photo.
+    # Match actual masthead artwork, never the hidden eproof tracking pixel.
+    logo = None
     for img in soup.find_all('img'):
-        attrs = ' '.join(str(img.get(k, '')) for k in ('src', 'alt', 'id', 'class')).lower()
-        if 'logo' in attrs or 'masthead' in attrs or 'drudge' in attrs or 'eproof.drudgereport.com' in attrs:
-            img['src'] = LOGO_URL
-            img['srcset'] = ''
-            img['alt'] = 'Your site logo'
-            img['style'] = (img.get('style', '') + ';display:block;max-width:min(95vw,700px);width:100%;height:auto;object-fit:contain;margin:0 auto;').strip(';')
-            return img
-    # Some editions use an old-fashioned text masthead.
-    for text in soup.find_all(string=re.compile(r'DRUDGE\s+REPORT', re.I)):
-        parent = text.parent
-        if parent and parent.name not in ('script', 'style', 'title'):
-            if parent.name in ('a', 'b', 'strong', 'font', 'center', 'div'):
-                logo = soup.new_tag('img', src=LOGO_URL, alt='Your site logo')
-                logo['style'] = 'display:block;max-width:min(95vw,700px);width:100%;height:auto;object-fit:contain;margin:0 auto'
-                parent.clear()
-                parent.append(logo)
-                return logo
-    # Fallback: introduce branded heading without deleting news content.
-    logo = soup.new_tag('img', src=LOGO_URL, alt='Your site logo')
-    logo['style'] = 'display:block;max-width:min(95vw,700px);width:100%;height:auto;object-fit:contain;margin:14px auto'
-    (soup.body or soup).insert(0, logo)
+        src = img.get('src', '').lower()
+        attrs = ' '.join(str(img.get(k, '')) for k in ('alt', 'id', 'class')).lower()
+        if any(x in src for x in ('pixel', 'tracker', 'eproof.')):
+            continue
+        if 'logo' in src or 'masthead' in attrs or 'drudge report' in attrs:
+            logo = img
+            break
+    if logo is None:
+        logo = soup.new_tag('img')
+        (soup.body or soup).insert(0, logo)
+    logo.attrs = {
+        'src': LOGO_URL, 'alt': 'SAWDRUDGE', 'id': 'sawdrudge-logo',
+        'width': '593', 'height': '155',
+        'style': 'display:block;width:593px;max-width:95vw;height:auto;visibility:visible;object-fit:contain;margin:16px auto;'
+    }
+    if logo.parent.name == 'a':
+        logo.parent['href'] = '/'
     return logo
 
 
 def replace_main_image(soup, masthead):
-    # Select the first editorial-sized image, skipping logos, trackers, and tiny icons.
-    for img in soup.find_all('img'):
+    main = soup.find(id='DR-HU-MAIN')
+    # Prefer an image already in the main headline, otherwise replace the first
+    # editorial photo and move the replacement into the centered headline area.
+    candidates = list(main.find_all('img')) if main else []
+    candidates += [i for i in soup.find_all('img') if i not in candidates]
+    hero = None
+    for img in candidates:
         if img is masthead:
             continue
         attrs = ' '.join(str(img.get(k, '')) for k in ('src', 'alt', 'id', 'class')).lower()
-        if any(x in attrs for x in ('logo', 'masthead', 'drudge', 'pixel', 'tracker', 'icon', 'badge', 'button', 'spacer')):
+        if any(x in attrs for x in ('logo', 'masthead', 'pixel', 'tracker', 'eproof.', 'icon', 'badge', 'button', 'spacer')):
             continue
         try:
             w, h = int(img.get('width', 0)), int(img.get('height', 0))
@@ -80,24 +82,24 @@ def replace_main_image(soup, masthead):
             w, h = 0, 0
         if (w and w < 100) or (h and h < 70):
             continue
-
-        img['src'] = HERO_URL
-        img.attrs.pop('srcset', None)
-        img['alt'] = 'Custom main image'
-        existing = img.get('style', '').rstrip(';')
-        img['style'] = (existing + ';display:block;max-width:100%;width:auto;height:auto;object-fit:contain;').strip(';')
-        return True
-
-    # Fallback: if no qualifying image is found, inject the custom hero below the masthead.
-    hero = soup.new_tag('img', src=HERO_URL, alt='Custom main image')
-    hero['style'] = 'display:block;max-width:100%;width:auto;height:auto;object-fit:contain;margin:10px auto;'
-    anchor = masthead
-    if anchor and getattr(anchor, 'parent', None):
-        anchor.insert_after(hero)
-    elif soup.body:
-        soup.body.insert(1, hero)
+        hero = img.extract()
+        break
+    if hero is None:
+        hero = soup.new_tag('img')
+    hero.attrs = {
+        'src': HERO_URL, 'alt': 'Billy', 'id': 'sawdrudge-hero',
+        'width': '300',
+        'style': 'display:block;width:300px;max-width:90vw;height:auto;object-fit:contain;margin:12px auto 18px;'
+    }
+    wrapper = soup.new_tag('div', id='sawdrudge-hero-wrap')
+    wrapper['style'] = 'display:block;width:100%;text-align:center;clear:both;'
+    wrapper.append(hero)
+    if main:
+        main.insert(0, wrapper)
+    elif masthead.parent.name == 'a':
+        masthead.parent.insert_before(wrapper)
     else:
-        soup.insert(0, hero)
+        masthead.insert_before(wrapper)
     return True
 
 
