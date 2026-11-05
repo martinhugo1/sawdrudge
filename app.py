@@ -55,8 +55,8 @@ def replace_masthead(soup):
         (soup.body or soup).insert(0, logo)
     logo.attrs = {
         'src': LOGO_URL, 'alt': 'SAWDRUDGE', 'id': 'sawdrudge-logo',
-        'width': '593', 'height': '155',
-        'style': 'display:block;width:593px;max-width:95vw;height:auto;visibility:visible;object-fit:contain;margin:16px auto;'
+        'width': '520',
+        'style': 'display:block;width:520px;max-width:95vw;height:auto;visibility:visible;object-fit:contain;margin:16px auto;'
     }
     if logo.parent.name == 'a':
         logo.parent['href'] = '/'
@@ -65,10 +65,8 @@ def replace_masthead(soup):
 
 def replace_main_image(soup, masthead):
     main = soup.find(id='DR-HU-MAIN')
-    # Prefer an image already in the main headline, otherwise replace the first
-    # editorial photo and move the replacement into the centered headline area.
+    # Only replace the main headline image. Preserve every sidebar photo.
     candidates = list(main.find_all('img')) if main else []
-    candidates += [i for i in soup.find_all('img') if i not in candidates]
     hero = None
     for img in candidates:
         if img is masthead:
