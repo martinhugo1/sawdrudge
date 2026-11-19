@@ -102,20 +102,23 @@ def replace_main_image(soup, masthead):
 
 
 def add_sound(soup):
-    audio_files = {
-        'sawdrudge-theme': 'saw-theme.mp3',
-        'sawdrudge-clip': 'play-a-game.mp3',
-    }
-    if not soup.body or not all(
-        os.path.isfile(os.path.join(app.static_folder, filename))
-        for filename in audio_files.values()
-    ):
+    if not soup.body:
         return
 
-    for element_id, filename in audio_files.items():
-        audio = soup.new_tag('audio', id=element_id, src='/static/' + filename)
-        audio['preload'] = 'auto'
-        soup.body.append(audio)
+    theme = soup.new_tag(
+        'audio',
+        id='sawdrudge-theme',
+        src='https://www.myinstants.com/media/sounds/saw-theme-song-.mp3',
+        preload='auto',
+        loop='',
+    )
+    soup.body.append(theme)
+
+    if os.path.isfile(os.path.join(app.static_folder, 'play-a-game.mp3')):
+        clip = soup.new_tag(
+            'audio', id='sawdrudge-clip', src='/static/play-a-game.mp3', preload='auto'
+        )
+        soup.body.append(clip)
 
     button = soup.new_tag('button', id='sawdrudge-sound', type='button')
     button.string = 'Play sound'
@@ -156,10 +159,12 @@ def add_sound(soup):
         enabled = true;
         button.textContent = 'Mute sound';
         fadeDelay = setTimeout(() => fadeTheme(performance.now()), 15000);
-        interval = setInterval(() => {
-            clip.currentTime = 0;
-            clip.play().catch(() => {});
-        }, 60000);
+        if (clip) {
+            interval = setInterval(() => {
+                clip.currentTime = 0;
+                clip.play().catch(() => {});
+            }, 60000);
+        }
     }
 
     button.addEventListener('click', () => {
@@ -172,7 +177,7 @@ def add_sound(soup):
         clearInterval(interval);
         cancelAnimationFrame(fadeFrame);
         theme.pause();
-        clip.pause();
+        clip?.pause();
         button.textContent = 'Play sound';
     });
     enableSound();
