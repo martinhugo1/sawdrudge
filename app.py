@@ -110,7 +110,6 @@ def add_sound(soup):
         id='sawdrudge-theme',
         src='https://www.myinstants.com/media/sounds/saw-theme-song-.mp3',
         preload='auto',
-        loop='',
     )
     soup.body.append(theme)
 
@@ -131,13 +130,12 @@ def add_sound(soup):
     const clip = document.getElementById('sawdrudge-clip');
     let enabled = false;
     let interval;
-    let fadeDelay;
     let fadeFrame;
     let starting = false;
 
     function fadeTheme(start) {
         theme.volume = Math.max(0, 1 - (performance.now() - start) / 1500);
-        if (theme.volume > 0) {
+        if (theme.volume > 0 && !theme.ended) {
             fadeFrame = requestAnimationFrame(() => fadeTheme(start));
         } else {
             theme.pause();
@@ -158,7 +156,6 @@ def add_sound(soup):
         }
         enabled = true;
         button.textContent = 'Mute sound';
-        fadeDelay = setTimeout(() => fadeTheme(performance.now()), 15000);
         if (clip) {
             interval = setInterval(() => {
                 clip.currentTime = 0;
@@ -167,15 +164,21 @@ def add_sound(soup):
         }
     }
 
+    theme.addEventListener('timeupdate', () => {
+        if (enabled && fadeFrame === undefined && theme.currentTime >= theme.duration / 2) {
+            fadeFrame = requestAnimationFrame(() => fadeTheme(performance.now()));
+        }
+    });
+
     button.addEventListener('click', () => {
         if (!enabled) {
             enableSound();
             return;
         }
         enabled = false;
-        clearTimeout(fadeDelay);
         clearInterval(interval);
         cancelAnimationFrame(fadeFrame);
+        fadeFrame = undefined;
         theme.pause();
         clip?.pause();
         button.textContent = 'Play sound';
