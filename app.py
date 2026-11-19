@@ -86,8 +86,8 @@ def replace_main_image(soup, masthead):
         hero = soup.new_tag('img')
     hero.attrs = {
         'src': HERO_URL, 'alt': 'Billy', 'id': 'sawdrudge-hero',
-        'width': '300',
-        'style': 'display:block;width:300px;max-width:90vw;height:auto;object-fit:contain;margin:12px auto 18px;'
+        'width': '345',
+        'style': 'display:block;width:345px;max-width:90vw;height:auto;object-fit:contain;margin:12px auto 18px;'
     }
     wrapper = soup.new_tag('div', id='sawdrudge-hero-wrap')
     wrapper['style'] = 'display:block;width:100%;text-align:center;clear:both;'
@@ -99,6 +99,85 @@ def replace_main_image(soup, masthead):
     else:
         masthead.insert_before(wrapper)
     return True
+
+
+def add_sound(soup):
+    audio_files = {
+        'sawdrudge-theme': 'saw-theme.mp3',
+        'sawdrudge-clip': 'play-a-game.mp3',
+    }
+    if not soup.body or not all(
+        os.path.isfile(os.path.join(app.static_folder, filename))
+        for filename in audio_files.values()
+    ):
+        return
+
+    for element_id, filename in audio_files.items():
+        audio = soup.new_tag('audio', id=element_id, src='/static/' + filename)
+        audio['preload'] = 'auto'
+        soup.body.append(audio)
+
+    button = soup.new_tag('button', id='sawdrudge-sound', type='button')
+    button.string = 'Play sound'
+    button['style'] = 'position:fixed;right:12px;bottom:12px;z-index:1000;'
+    soup.body.append(button)
+    script = soup.new_tag('script')
+    script.string = """(() => {
+    const button = document.getElementById('sawdrudge-sound');
+    const theme = document.getElementById('sawdrudge-theme');
+    const clip = document.getElementById('sawdrudge-clip');
+    let enabled = false;
+    let interval;
+    let fadeDelay;
+    let fadeFrame;
+    let starting = false;
+
+    function fadeTheme(start) {
+        theme.volume = Math.max(0, 1 - (performance.now() - start) / 1500);
+        if (theme.volume > 0) {
+            fadeFrame = requestAnimationFrame(() => fadeTheme(start));
+        } else {
+            theme.pause();
+        }
+    }
+
+    async function enableSound() {
+        if (starting || enabled) return;
+        starting = true;
+        try {
+            theme.currentTime = 0;
+            theme.volume = 1;
+            await theme.play();
+        } catch {
+            return;
+        } finally {
+            starting = false;
+        }
+        enabled = true;
+        button.textContent = 'Mute sound';
+        fadeDelay = setTimeout(() => fadeTheme(performance.now()), 15000);
+        interval = setInterval(() => {
+            clip.currentTime = 0;
+            clip.play().catch(() => {});
+        }, 60000);
+    }
+
+    button.addEventListener('click', () => {
+        if (!enabled) {
+            enableSound();
+            return;
+        }
+        enabled = false;
+        clearTimeout(fadeDelay);
+        clearInterval(interval);
+        cancelAnimationFrame(fadeFrame);
+        theme.pause();
+        clip.pause();
+        button.textContent = 'Play sound';
+    });
+    enableSound();
+})();"""
+    soup.body.append(script)
 
 
 def build_page(raw):
@@ -121,6 +200,7 @@ def build_page(raw):
         soup.head.append(style)
     masthead = replace_masthead(soup)
     replace_main_image(soup, masthead)
+    add_sound(soup)
     return str(soup)
 
 
