@@ -86,8 +86,8 @@ def replace_main_image(soup, masthead):
         hero = soup.new_tag('img')
     hero.attrs = {
         'src': HERO_URL, 'alt': 'Billy', 'id': 'sawdrudge-hero',
-        'width': '345',
-        'style': 'display:block;width:345px;max-width:90vw;height:auto;object-fit:contain;margin:12px auto 18px;'
+        'width': '420',
+        'style': 'display:block;width:420px;max-width:90vw;height:auto;object-fit:contain;margin:12px auto 18px;'
     }
     wrapper = soup.new_tag('div', id='sawdrudge-hero-wrap')
     wrapper['style'] = 'display:block;width:100%;text-align:center;clear:both;'
